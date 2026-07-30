@@ -162,5 +162,56 @@ contract LoanRepaymentTracker is Ownable {
         emit LoanDefaulted(_loanId);
     }
 
-   
+    function checkOverdueLoans()
+        external
+        view
+        returns (uint256[] memory overdueLoans, uint256[] memory defaultLoans)
+    {
+        uint256 overdueCount = 0;
+        uint256 defaultCount = 0;
+
+        for (uint256 i; i <= loanCount; i++) {
+            if (loans[i].status == LoanStatus.Active) {
+                if (
+                    block.timestamp >
+                    loans[i].nextDueTimestamp + loans[i].gracePeriod
+                ) {
+                    defaultCount++;
+                } else if (
+                    block.timestamp > loans[i].nextDueTimestamp &&
+                    !loans[i].lateFeeAppliedForCurrentMonth
+                ) {
+                    overdueCount++;
+                }
+            }
+        }
+
+        overdueLoans = new uint256[](overdueCount);
+        defaultLoans = new uint256[](defaultCount);
+
+        uint256 oIdx = 0;
+        uint256 dIdx = 0;
+
+        for (uint256 i; i <= loanCount; i++) {
+            if (loans[i].status == LoanStatus.Active) {
+                if (
+                    block.timestamp >
+                    loans[i].nextDueTimestamp + loans[i].gracePeriod
+                ) {
+                    defaultLoans[oIdx] = i;
+                    dIdx++;
+                } else if (
+                    block.timestamp > loans[i].nextDueTimestamp &&
+                    !loans[i].lateFeeAppliedForCurrentMonth
+                ) {
+                    overdueLoans[oIdx] = i;
+                    oIdx++;
+                }
+            }
+        }
+    }
+
+    function withdrawRecoveredFunds(uint256 _amount) external onlyOwner {
+        if (LOAN_TOKEN.transfer(owner(), _amount)) revert WithdrawalFailed();
+    }
 }
