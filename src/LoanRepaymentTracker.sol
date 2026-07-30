@@ -136,5 +136,31 @@ contract LoanRepaymentTracker is Ownable {
         emit RePaymentMade(_loanId, loan.borrower, transferAmount);
     }
 
-    
+    function enforceLateFee(uint256 _loanId) external onlyOwner {
+        Loan storage loan = loans[_loanId];
+        if (loan.status != LoanStatus.Active) revert LoanIsNotActive();
+        if (loan.nextDueTimestamp > block.timestamp)
+            revert PaymentNotOverdueyet();
+        if (loan.lateFeeAppliedForCurrentMonth) revert LateFeeAlreadyApplied();
+
+        loan.totalRemaining += loan.lateFeeAmount;
+        loan.lateFeeAppliedForCurrentMonth = true;
+
+        emit LateFeeApplied(_loanId, loan.lateFeeAmount);
+    }
+
+    function enforceDefault(uint256 _loanId) external {
+        Loan storage loan = loans[_loanId];
+        if (loan.status != LoanStatus.Active) revert LoanIsNotActive();
+        if (loan.nextDueTimestamp > block.timestamp)
+            revert PaymentNotOverdueyet();
+        if (block.timestamp < loan.nextDueTimestamp + loan.gracePeriod)
+            revert GracePeriodStillActive();
+
+        loan.status = LoanStatus.Defaulted;
+
+        emit LoanDefaulted(_loanId);
+    }
+
+   
 }
