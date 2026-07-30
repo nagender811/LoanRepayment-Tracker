@@ -102,5 +102,39 @@ contract LoanRepaymentTracker is Ownable {
         emit LoanCreated(loanCount, _borrower, _principal);
     }
 
+    function makeRepayment(uint256 _loanId, uint256 _amount) external {
+        Loan storage loan = loans[_loanId];
+        if (loan.status != LoanStatus.Active) revert LoanIsNotActive();
+        if (_amount < 0) revert PaymentAmountMustGreaterThanZero();
+
+        uint256 transferAmount = _amount;
+
+        if (_amount >= loan.totalRemaining) {
+            transferAmount = loan.totalRemaining;
+            loan.totalRemaining = 0;
+            loan.status = LoanStatus.Paid;
+            emit LoanFullyPaid(_loanId);
+        } else {
+            loan.totalRemaining -= _amount;
+        }
+
+        if (transferAmount >= loan.monthlyInstallment) {
+            loan.nextDueTimestamp = block.timestamp + MONTH_DURATION;
+            loan.lateFeeAppliedForCurrentMonth = false;
+        }
+
+        loan.lastPaymentTimestamp = block.timestamp;
+
+        bool success = LOAN_TOKEN.transferFrom(
+            msg.sender,
+            address(this),
+            transferAmount
+        );
+
+        if (!success) revert PaymentTransferFailed();
+
+        emit RePaymentMade(_loanId, loan.borrower, transferAmount);
+    }
+
     
 }
