@@ -65,5 +65,42 @@ contract LoanRepaymentTracker is Ownable {
         LOAN_TOKEN = IERC20(_loanToken);
     }
 
-   
+    function createLoan(
+        address _borrower,
+        uint256 _principal,
+        uint256 _monthlyInstallment,
+        uint256 _lateFeeAmount,
+        uint256 _gracePeriod
+    ) external onlyOwner {
+        if (_borrower == address(0)) revert InvalidBorrowerAddress();
+        if (_principal < 0) revert PrincipalMustGreaterThanZero();
+        if (_monthlyInstallment < 0) revert InstallmentMustGreaterThanZero();
+
+        loanCount++;
+
+        loans[loanCount] = Loan({
+            borrower: _borrower,
+            principal: _principal,
+            totalRemaining: _principal,
+            monthlyInstallment: _monthlyInstallment,
+            lastPaymentTimestamp: block.timestamp,
+            nextDueTimestamp: block.timestamp + MONTH_DURATION,
+            lateFeeAmount: _lateFeeAmount,
+            gracePeriod: _gracePeriod,
+            status: LoanStatus.Active,
+            lateFeeAppliedForCurrentMonth: false
+        });
+
+        bool success = LOAN_TOKEN.transferFrom(
+            msg.sender,
+            _borrower,
+            _principal
+        );
+
+        if (!success) revert PrincipalTransferFailed();
+
+        emit LoanCreated(loanCount, _borrower, _principal);
+    }
+
+    
 }
